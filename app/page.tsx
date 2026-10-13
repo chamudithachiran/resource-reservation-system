@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -36,7 +35,13 @@ type DashboardData = {
 };
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid date";
+  }
+
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -44,7 +49,13 @@ function formatDate(value: string) {
 }
 
 function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString("en-US", {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "--:--";
+  }
+
+  return date.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -77,8 +88,11 @@ export default function Home() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     async function loadDashboard() {
       try {
         const response = await fetch("/api/dashboard", {
@@ -93,19 +107,30 @@ export default function Home() {
           );
         }
 
-        setData(result.data as DashboardData);
+        if (active) {
+          setData(result.data as DashboardData);
+          setError("");
+        }
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Something went wrong."
-        );
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Something went wrong."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
 
-    loadDashboard();
+    void loadDashboard();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const stats = [
@@ -142,6 +167,10 @@ export default function Home() {
   const reservations = data?.recentReservations ?? [];
   const resources = data?.dashboardResources ?? [];
 
+  const pendingReservations = reservations.filter(
+    (reservation) => reservation.status === "PENDING"
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f7f8fc] text-slate-600">
@@ -157,9 +186,11 @@ export default function Home() {
           <p className="font-semibold text-red-600">
             Failed to load dashboard
           </p>
+
           <p className="mt-2 text-sm text-slate-500">
             {error || "Dashboard data unavailable."}
           </p>
+
           <button
             type="button"
             onClick={() => window.location.reload()}
@@ -181,6 +212,7 @@ export default function Home() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500 text-xl font-bold">
               P
             </div>
+
             <div>
               <h1 className="text-lg font-bold tracking-tight">
                 PrimeWave
@@ -214,7 +246,9 @@ export default function Home() {
                   <span className="w-5 text-center text-lg">
                     {icon}
                   </span>
+
                   {label}
+
                   {label === "Reservations" &&
                     data.pendingReservations > 0 && (
                       <span className="ml-auto rounded-md bg-white/10 px-2 py-0.5 text-xs">
@@ -248,6 +282,7 @@ export default function Home() {
                   System operational
                 </span>
               </div>
+
               <p className="text-xs leading-5 text-slate-400">
                 Your workspace is ready. Manage resources and reservations
                 from one place.
@@ -258,12 +293,14 @@ export default function Home() {
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500 font-semibold">
                 AD
               </div>
+
               <div className="min-w-0">
                 <p className="text-sm font-semibold">Administrator</p>
                 <p className="truncate text-xs text-slate-400">
                   admin@primewave.lab
                 </p>
               </div>
+
               <span className="ml-auto text-slate-400">⋯</span>
             </div>
           </div>
@@ -276,10 +313,12 @@ export default function Home() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-xl text-violet-600 lg:hidden">
                 P
               </div>
+
               <div>
                 <p className="text-xs text-slate-500">
                   Workspace / Overview
                 </p>
+
                 <h2 className="text-lg font-bold text-slate-900">
                   Dashboard
                 </h2>
@@ -287,21 +326,183 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-3 sm:gap-5">
-              <button
-                type="button"
-                aria-label="Notifications"
-                className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-lg text-slate-600 transition hover:bg-slate-50"
-              >
-                ♧
-                {data.pendingReservations > 0 && (
-                  <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
+              {/* Notifications */}
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Notifications"
+                  aria-expanded={notificationsOpen}
+                  aria-haspopup="true"
+                  onClick={() =>
+                    setNotificationsOpen((open) => !open)
+                  }
+                  className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-lg text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  <svg
+                    aria-hidden="true"
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="21"
+                    height="21"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                    <path d="M10 21h4" />
+                  </svg>
+
+                  {data.pendingReservations > 0 && (
+                    <>
+                      <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
+                      <span className="sr-only">
+                        {data.pendingReservations} pending reservations
+                      </span>
+                    </>
+                  )}
+                </button>
+
+                {notificationsOpen && (
+                  <div
+                    role="region"
+                    aria-label="Notifications panel"
+                    className="absolute right-0 top-12 z-50 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
+                      <div>
+                        <h3 className="font-bold text-slate-900">
+                          Notifications
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Reservation updates
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        aria-label="Close notifications"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                      >
+                        <span aria-hidden="true">✕</span>
+                      </button>
+                    </div>
+
+                    {data.pendingReservations > 0 ? (
+                      <div className="max-h-80 overflow-y-auto p-3">
+                        <div className="mb-3 rounded-xl bg-amber-50 px-3 py-2.5">
+                          <p className="text-sm font-semibold text-amber-800">
+                            {data.pendingReservations} pending{" "}
+                            {data.pendingReservations === 1
+                              ? "reservation"
+                              : "reservations"}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-amber-700">
+                            These requests are waiting for approval.
+                          </p>
+                        </div>
+
+                        {pendingReservations.map((reservation) => (
+                          <div
+                            key={reservation.id}
+                            className="border-b border-slate-100 px-2 py-3 last:border-b-0"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                                <svg
+                                  aria-hidden="true"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="18"
+                                  height="18"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <circle cx="12" cy="12" r="9" />
+                                  <path d="M12 7v5l3 2" />
+                                </svg>
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-slate-800">
+                                  Reservation awaiting approval
+                                </p>
+
+                                <p className="mt-1 text-sm text-slate-600">
+                                  {reservation.resource.name}
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Requested by{" "}
+                                  {reservation.user.name}
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {formatDate(reservation.startTime)} ·{" "}
+                                  {formatTime(reservation.startTime)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="px-5 py-8 text-center">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                          <svg
+                            aria-hidden="true"
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="23"
+                            height="23"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="m5 12 4 4L19 6" />
+                          </svg>
+                        </div>
+
+                        <p className="mt-3 text-sm font-semibold text-slate-800">
+                          You&apos;re all caught up!
+                        </p>
+
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          There are no pending reservations to review.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="border-t border-slate-100 bg-slate-50 p-3">
+                      <a
+                        href="/reservations"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="flex w-full items-center justify-center rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700"
+                      >
+                        View reservations
+                        <span className="ml-2" aria-hidden="true">
+                          →
+                        </span>
+                      </a>
+                    </div>
+                  </div>
                 )}
-              </button>
+              </div>
+
               <div className="hidden h-9 border-l border-slate-200 sm:block" />
+
               <div className="flex items-center gap-2">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
                   AD
                 </div>
+
                 <div className="hidden sm:block">
                   <p className="text-sm font-semibold">Administrator</p>
                   <p className="text-xs text-slate-500">Super Admin</p>
@@ -315,16 +516,13 @@ export default function Home() {
             <section className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
               <div>
                 <p className="mb-2 text-sm font-medium text-violet-600">
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  }).toUpperCase()}
+                  WORKSPACE OVERVIEW
                 </p>
+
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                   Welcome back, Administrator 👋
                 </h1>
+
                 <p className="mt-2 text-sm text-slate-500">
                   Here&apos;s what&apos;s happening in your workspace today.
                 </p>
@@ -350,15 +548,18 @@ export default function Home() {
                     <p className="text-sm font-medium text-slate-500">
                       {stat.label}
                     </p>
+
                     <div
                       className={`flex h-11 w-11 items-center justify-center rounded-xl text-xl ${stat.color}`}
                     >
                       {stat.icon}
                     </div>
                   </div>
+
                   <p className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
                     {stat.value}
                   </p>
+
                   <p className="mt-2 text-xs text-slate-500">
                     {stat.change}
                   </p>
@@ -374,10 +575,12 @@ export default function Home() {
                     <h3 className="font-bold text-slate-900">
                       Recent Reservations
                     </h3>
+
                     <p className="mt-1 text-xs text-slate-500">
                       Latest booking requests from the database
                     </p>
                   </div>
+
                   <a
                     href="/reservations"
                     className="text-sm font-semibold text-violet-600 hover:text-violet-800"
@@ -396,6 +599,7 @@ export default function Home() {
                         <th className="px-4 py-4">Status</th>
                       </tr>
                     </thead>
+
                     <tbody className="divide-y divide-slate-100">
                       {reservations.map((reservation, index) => (
                         <tr
@@ -406,10 +610,12 @@ export default function Home() {
                             <p className="whitespace-nowrap text-sm font-semibold text-slate-800">
                               {reservation.resource.name}
                             </p>
+
                             <p className="mt-1 text-xs text-slate-500">
                               {reservation.resource.type}
                             </p>
                           </td>
+
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-2">
                               <span
@@ -419,20 +625,24 @@ export default function Home() {
                               >
                                 {getInitials(reservation.user.name)}
                               </span>
+
                               <span className="whitespace-nowrap text-sm text-slate-600">
                                 {reservation.user.name}
                               </span>
                             </div>
                           </td>
+
                           <td className="px-4 py-4">
                             <p className="whitespace-nowrap text-sm text-slate-700">
                               {formatDate(reservation.startTime)}
                             </p>
+
                             <p className="mt-1 whitespace-nowrap text-xs text-slate-500">
                               {formatTime(reservation.startTime)} –{" "}
                               {formatTime(reservation.endTime)}
                             </p>
                           </td>
+
                           <td className="px-4 py-4">
                             <span
                               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -478,10 +688,12 @@ export default function Home() {
                     <h3 className="font-bold text-slate-900">
                       Resource Availability
                     </h3>
+
                     <p className="mt-1 text-xs text-slate-500">
                       Resources registered in the database
                     </p>
                   </div>
+
                   <a
                     href="/resources"
                     className="text-sm font-semibold text-violet-600"
@@ -505,21 +717,25 @@ export default function Home() {
                           ? "▣"
                           : "▤"}
                       </div>
+
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-slate-800">
                           {resource.name}
                         </p>
+
                         <p className="mt-1 text-xs text-slate-500">
                           {resource.type}
                           {resource.capacity !== null
                             ? ` · ${resource.capacity} seats`
                             : ""}
                         </p>
+
                         {resource.location && (
                           <p className="mt-1 text-xs text-slate-400">
                             {resource.location}
                           </p>
                         )}
+
                         <div className="mt-2 flex items-center gap-1.5">
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${
@@ -528,6 +744,7 @@ export default function Home() {
                                 : "bg-amber-500"
                             }`}
                           />
+
                           <span
                             className={`text-xs font-medium ${
                               resource.isAvailable
@@ -555,9 +772,11 @@ export default function Home() {
                   <p className="text-sm font-semibold text-violet-900">
                     Need another resource?
                   </p>
+
                   <p className="mt-1 text-xs leading-5 text-violet-700">
                     Explore the resource directory to find what you need.
                   </p>
+
                   <a
                     href="/resources"
                     className="mt-3 inline-flex text-xs font-bold text-violet-700 hover:text-violet-900"
@@ -568,11 +787,12 @@ export default function Home() {
               </div>
             </section>
 
-            {/* Bottom info */}
+            {/* Footer */}
             <footer className="mt-8 flex flex-col justify-between gap-2 border-t border-slate-200 py-5 text-xs text-slate-400 sm:flex-row">
               <p>
                 © {new Date().getFullYear()} PrimeWave Lab. Resource Reservation Management.
               </p>
+
               <p>Live data from your PostgreSQL database</p>
             </footer>
           </div>
