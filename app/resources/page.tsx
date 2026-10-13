@@ -475,7 +475,7 @@ export default function ResourcesPage() {
             </div>
           )}
         </section>
-
+//
         <footer className="mt-6 text-center text-xs text-slate-400">
           PrimeWave Lab Resource Reservation Management System
         </footer>
