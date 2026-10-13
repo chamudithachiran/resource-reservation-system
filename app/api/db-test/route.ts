@@ -24,7 +24,5 @@ export async function GET() {
       { success: false, message: "Database connection failed." },
       { status: 500 },
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
