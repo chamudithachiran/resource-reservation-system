@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+<rect width="1200" height="760" fill="#f8fafc"/>
+<text x="600" y="48" text-anchor="middle" font-family="Arial,sans-serif" font-size="28" font-weight="700" fill="#0f172a">PrimeWave Lab — Entity Relationship Diagram</text>
+<text x="600" y="76" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" fill="#475569">PostgreSQL · Prisma · Resource Reservation Management System</text>
+<defs>
+  <style>
+    .entity{fill:#fff;stroke:#334155;stroke-width:2;rx:12}
+    .head{fill:#0f766e;rx:10}
+    .title{font:700 20px Arial,sans-serif;fill:#fff}
+    .field{font:15px 'Courier New',monospace;fill:#0f172a}
+    .rel{stroke:#475569;stroke-width:2.5;fill:none}
+    .label{font:14px Arial,sans-serif;fill:#334155;font-weight:600}
+  </style>
+</defs>
+<!-- User -->
+<rect class="entity" x="70" y="145" width="320" height="300"/>
+<rect class="head" x="70" y="145" width="320" height="48"/>
+<text class="title" x="230" y="176" text-anchor="middle">USER</text>
+<text class="field" x="92" y="225">PK  id: UUID</text>
+<text class="field" x="92" y="255">     name: String</text>
+<text class="field" x="92" y="285">UK  email: String</text>
+<text class="field" x="92" y="315">     createdAt: DateTime</text>
+<text class="field" x="92" y="345">     updatedAt: DateTime</text>
+<text x="92" y="405" font-family="Arial,sans-serif" font-size="13" fill="#64748b">One user can make many reservations</text>
+<!-- Resource -->
+<rect class="entity" x="810" y="145" width="320" height="330"/>
+<rect class="head" x="810" y="145" width="320" height="48"/>
+<text class="title" x="970" y="176" text-anchor="middle">RESOURCE</text>
+<text class="field" x="832" y="225">PK  id: UUID</text>
+<text class="field" x="832" y="255">     name: String</text>
+<text class="field" x="832" y="285">     description: String?</text>
+<text class="field" x="832" y="315">     type: String</text>
+<text class="field" x="832" y="345">     capacity: Int?</text>
+<text class="field" x="832" y="375">     location: String?</text>
+<text class="field" x="832" y="405">     isAvailable: Boolean</text>
+<text class="field" x="832" y="435">     createdAt / updatedAt</text>
+<!-- Reservation -->
+<rect class="entity" x="420" y="385" width="360" height="320"/>
+<rect class="head" x="420" y="385" width="360" height="48"/>
+<text class="title" x="600" y="416" text-anchor="middle">RESERVATION</text>
+<text class="field" x="442" y="465">PK  id: UUID</text>
+<text class="field" x="442" y="495">FK  userId: UUID</text>
+<text class="field" x="442" y="525">FK  resourceId: UUID</text>
+<text class="field" x="442" y="555">     startTime: DateTime</text>
+<text class="field" x="442" y="585">     endTime: DateTime</text>
+<text class="field" x="442" y="615">     status: String</text>
+<text class="field" x="442" y="645">     purpose: String?</text>
+<text x="442" y="680" font-family="Arial,sans-serif" font-size="13" fill="#64748b">createdAt / updatedAt also stored</text>
+<!-- Relationships -->
+<path class="rel" d="M230 445 L230 540 L420 540"/>
+<path class="rel" d="M390 540 l-12 -7 M390 540 l-12 7"/>
+<text class="label" x="250" y="526">1 user</text>
+<text class="label" x="335" y="563">0..* reservations</text>
+<path class="rel" d="M970 475 L970 585 L780 585"/>
+<path class="rel" d="M792 578 l-12 7 12 7"/>
+<text class="label" x="830" y="565">0..* reservations</text>
+<text class="label" x="850" y="610">1 resource per reservation</text>
+<text x="600" y="738" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" fill="#64748b">PK = Primary Key · FK = Foreign Key · UK = Unique Key · ? = Nullable</text>
+</svg>

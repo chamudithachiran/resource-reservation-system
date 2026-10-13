@@ -81,7 +81,7 @@ export default function ReservationsPage() {
 
       if (!reservationsRes.ok || !reservationsJson.success) {
         throw new Error(
-          reservationsJson.error || "Could not load reservations."
+          reservationsJson.error || "Could not load reservations.",
         );
       }
 
@@ -89,15 +89,79 @@ export default function ReservationsPage() {
       setResources(resourcesJson.data);
       setReservations(reservationsJson.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(
+        err instanceof Error ? err.message : "Something went wrong.",
+      );
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Load initial data without calling a state-updating function
+  // directly from the effect body.
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    let active = true;
+
+    async function fetchInitialData() {
+      setError("");
+
+      try {
+        const [usersRes, resourcesRes, reservationsRes] =
+          await Promise.all([
+            fetch("/api/users"),
+            fetch("/api/resources"),
+            fetch("/api/reservations"),
+          ]);
+
+        const [usersJson, resourcesJson, reservationsJson] =
+          await Promise.all([
+            usersRes.json(),
+            resourcesRes.json(),
+            reservationsRes.json(),
+          ]);
+
+        if (!usersRes.ok || !usersJson.success) {
+          throw new Error(usersJson.error || "Could not load users.");
+        }
+
+        if (!resourcesRes.ok || !resourcesJson.success) {
+          throw new Error(
+            resourcesJson.error || "Could not load resources.",
+          );
+        }
+
+        if (!reservationsRes.ok || !reservationsJson.success) {
+          throw new Error(
+            reservationsJson.error || "Could not load reservations.",
+          );
+        }
+
+        if (active) {
+          setUsers(usersJson.data);
+          setResources(resourcesJson.data);
+          setReservations(reservationsJson.data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Something went wrong.",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void fetchInitialData();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -138,7 +202,9 @@ export default function ReservationsPage() {
 
       if (!response.ok || !result.success) {
         throw new Error(
-          result.error || result.message || "Could not create reservation."
+          result.error ||
+            result.message ||
+            "Could not create reservation.",
         );
       }
 
@@ -150,7 +216,9 @@ export default function ReservationsPage() {
       await loadData();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not create reservation."
+        err instanceof Error
+          ? err.message
+          : "Could not create reservation.",
       );
     } finally {
       setSaving(false);
@@ -159,11 +227,15 @@ export default function ReservationsPage() {
 
   async function updateStatus(
     reservationId: string,
-    status: "APPROVED" | "REJECTED"
+    status: "APPROVED" | "REJECTED",
   ) {
     const action = status === "APPROVED" ? "approve" : "reject";
 
-    if (!window.confirm(`Are you sure you want to ${action} this reservation?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to ${action} this reservation?`,
+      )
+    ) {
       return;
     }
 
@@ -178,20 +250,26 @@ export default function ReservationsPage() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
-        }
+        },
       );
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || `Could not ${action} reservation.`);
+        throw new Error(
+          result.error || `Could not ${action} reservation.`,
+        );
       }
 
-      setSuccess(result.message || `Reservation ${action}d successfully.`);
+      setSuccess(
+        result.message || `Reservation ${action}d successfully.`,
+      );
       await loadData();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : `Could not ${action} reservation.`
+        err instanceof Error
+          ? err.message
+          : `Could not ${action} reservation.`,
       );
     } finally {
       setUpdatingId("");
@@ -199,19 +277,19 @@ export default function ReservationsPage() {
   }
 
   const availableResources = resources.filter(
-    (resource) => resource.isAvailable
+    (resource) => resource.isAvailable,
   );
 
   const pendingCount = reservations.filter(
-    (reservation) => reservation.status === "PENDING"
+    (reservation) => reservation.status === "PENDING",
   ).length;
 
   const approvedCount = reservations.filter(
-    (reservation) => reservation.status === "APPROVED"
+    (reservation) => reservation.status === "APPROVED",
   ).length;
 
   const rejectedCount = reservations.filter(
-    (reservation) => reservation.status === "REJECTED"
+    (reservation) => reservation.status === "REJECTED",
   ).length;
 
   return (
@@ -241,20 +319,28 @@ export default function ReservationsPage() {
         </div>
 
         {error && (
-          <div role="alert" className="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          <div
+            role="alert"
+            className="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+          >
             {error}
           </div>
         )}
 
         {success && (
-          <div role="status" className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          <div
+            role="status"
+            className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
+          >
             {success}
           </div>
         )}
 
         <section className="mb-8 grid gap-6 lg:grid-cols-[380px_1fr]">
           <div className="h-fit rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
-            <h2 className="mb-1 text-xl font-semibold">Create Reservation</h2>
+            <h2 className="mb-1 text-xl font-semibold">
+              Create Reservation
+            </h2>
             <p className="mb-6 text-sm text-slate-400">
               Choose a user, resource, and booking time.
             </p>
@@ -310,7 +396,7 @@ export default function ReservationsPage() {
 
               <div>
                 <label className="mb-2 block text-sm text-slate-300">
-                  Start Date & Time *
+                  Start Date &amp; Time *
                 </label>
                 <input
                   type="datetime-local"
@@ -323,7 +409,7 @@ export default function ReservationsPage() {
 
               <div>
                 <label className="mb-2 block text-sm text-slate-300">
-                  End Date & Time *
+                  End Date &amp; Time *
                 </label>
                 <input
                   type="datetime-local"
@@ -351,7 +437,12 @@ export default function ReservationsPage() {
 
               <button
                 type="submit"
-                disabled={saving || loading || users.length === 0 || availableResources.length === 0}
+                disabled={
+                  saving ||
+                  loading ||
+                  users.length === 0 ||
+                  availableResources.length === 0
+                }
                 className="w-full rounded-xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? "Creating..." : "Create Reservation"}
@@ -367,12 +458,31 @@ export default function ReservationsPage() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {[
-                { label: "Total", count: reservations.length, color: "text-white" },
-                { label: "Pending", count: pendingCount, color: "text-amber-300" },
-                { label: "Approved", count: approvedCount, color: "text-emerald-300" },
-                { label: "Rejected", count: rejectedCount, color: "text-red-300" },
+                {
+                  label: "Total",
+                  count: reservations.length,
+                  color: "text-white",
+                },
+                {
+                  label: "Pending",
+                  count: pendingCount,
+                  color: "text-amber-300",
+                },
+                {
+                  label: "Approved",
+                  count: approvedCount,
+                  color: "text-emerald-300",
+                },
+                {
+                  label: "Rejected",
+                  count: rejectedCount,
+                  color: "text-red-300",
+                },
               ].map((item) => (
-                <div key={item.label} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-slate-800 bg-slate-950 p-4"
+                >
                   <p className="text-sm text-slate-400">{item.label}</p>
                   <p className={`mt-2 text-3xl font-bold ${item.color}`}>
                     {item.count}
@@ -382,7 +492,8 @@ export default function ReservationsPage() {
             </div>
 
             <div className="mt-6 rounded-xl border border-slate-800 bg-slate-950/60 p-5 text-sm leading-6 text-slate-400">
-              Reservations start as <strong className="text-amber-300">PENDING</strong>.
+              Reservations start as{" "}
+              <strong className="text-amber-300">PENDING</strong>.
               Approving checks whether another approved reservation overlaps
               with the same resource and time.
             </div>
@@ -398,7 +509,9 @@ export default function ReservationsPage() {
           </div>
 
           {loading ? (
-            <p className="p-8 text-sm text-slate-400">Loading reservations...</p>
+            <p className="p-8 text-sm text-slate-400">
+              Loading reservations...
+            </p>
           ) : reservations.length === 0 ? (
             <div className="p-10 text-center">
               <p className="font-medium">No reservations yet</p>
@@ -421,7 +534,10 @@ export default function ReservationsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {reservations.map((reservation) => (
-                    <tr key={reservation.id} className="transition hover:bg-slate-800/40">
+                    <tr
+                      key={reservation.id}
+                      className="transition hover:bg-slate-800/40"
+                    >
                       <td className="px-6 py-4">
                         <p className="font-medium">
                           {reservation.user?.name ?? "Unknown user"}
@@ -445,15 +561,17 @@ export default function ReservationsPage() {
                         {formatDate(reservation.endTime)}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                          reservation.status === "APPROVED"
-                            ? "bg-emerald-400/10 text-emerald-300"
-                            : reservation.status === "REJECTED"
-                              ? "bg-red-400/10 text-red-300"
-                              : reservation.status === "CANCELLED"
-                                ? "bg-slate-700 text-slate-300"
-                                : "bg-amber-400/10 text-amber-300"
-                        }`}>
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                            reservation.status === "APPROVED"
+                              ? "bg-emerald-400/10 text-emerald-300"
+                              : reservation.status === "REJECTED"
+                                ? "bg-red-400/10 text-red-300"
+                                : reservation.status === "CANCELLED"
+                                  ? "bg-slate-700 text-slate-300"
+                                  : "bg-amber-400/10 text-amber-300"
+                          }`}
+                        >
                           {reservation.status}
                         </span>
                       </td>
@@ -462,15 +580,27 @@ export default function ReservationsPage() {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => void updateStatus(reservation.id, "APPROVED")}
+                              onClick={() =>
+                                void updateStatus(
+                                  reservation.id,
+                                  "APPROVED",
+                                )
+                              }
                               disabled={updatingId !== ""}
                               className="rounded-lg bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
                             >
-                              {updatingId === reservation.id ? "Updating..." : "Approve"}
+                              {updatingId === reservation.id
+                                ? "Updating..."
+                                : "Approve"}
                             </button>
                             <button
                               type="button"
-                              onClick={() => void updateStatus(reservation.id, "REJECTED")}
+                              onClick={() =>
+                                void updateStatus(
+                                  reservation.id,
+                                  "REJECTED",
+                                )
+                              }
                               disabled={updatingId !== ""}
                               className="rounded-lg bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/20 disabled:opacity-50"
                             >

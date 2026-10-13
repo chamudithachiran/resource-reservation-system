@@ -1,7 +1,8 @@
 
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useState } from "react";
 
 type Resource = {
   id: string;
@@ -40,31 +41,44 @@ export default function ResourcesPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const loadResources = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/resources", {
-        cache: "no-store",
-      });
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to load resources.");
-      }
-
-      setResources(result.data);
-    } catch {
-      setError("Resources load කරන්න බැරි වුණා. නැවත උත්සාහ කරන්න.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    void loadResources();
-  }, [loadResources]);
+    let active = true;
+
+    async function fetchInitialResources() {
+      try {
+        const response = await fetch("/api/resources", {
+          cache: "no-store",
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Unable to load resources.");
+        }
+
+        if (active) {
+          setResources(result.data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load resources. Please try again.",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void fetchInitialResources();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,7 +93,13 @@ export default function ResourcesPage() {
       capacity !== null &&
       (!Number.isInteger(capacity) || capacity < 1)
     ) {
-      setError("Capacity එක 1 හෝ ඊට වැඩි පූර්ණ සංඛ්‍යාවක් විය යුතුයි.");
+      setError("Capacity must be a positive whole number.");
+      setSaving(false);
+      return;
+    }
+
+    if (!form.name.trim()) {
+      setError("Please enter a resource name.");
       setSaving(false);
       return;
     }
@@ -87,12 +107,14 @@ export default function ResourcesPage() {
     try {
       const response = await fetch("/api/resources", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          name: form.name,
+          name: form.name.trim(),
           type: form.type,
-          location: form.location,
-          description: form.description,
+          location: form.location.trim(),
+          description: form.description.trim(),
           capacity,
         }),
       });
@@ -100,18 +122,18 @@ export default function ResourcesPage() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Resource එක save කරන්න බැරි වුණා.");
+        throw new Error(result.message || "Unable to save resource.");
       }
 
       setResources((current) => [result.data, ...current]);
       setForm(initialForm);
       setShowForm(false);
-      setMessage("Resource එක සාර්ථකව එකතු කළා!");
+      setMessage("Resource added successfully.");
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Resource එක save කරන්න බැරි වුණා.",
+          : "Unable to save resource. Please try again.",
       );
     } finally {
       setSaving(false);
@@ -119,7 +141,7 @@ export default function ResourcesPage() {
   }
 
   const filteredResources = resources.filter((resource) => {
-    const query = search.toLowerCase();
+    const query = search.toLowerCase().trim();
 
     return (
       resource.name.toLowerCase().includes(query) ||
@@ -131,43 +153,73 @@ export default function ResourcesPage() {
   return (
     <main className="min-h-screen bg-[#f7f8fc] px-4 py-6 text-slate-800 sm:px-8 sm:py-8">
       <div className="mx-auto max-w-7xl">
-        <a
+        <Link
           href="/"
           className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-violet-600 hover:text-violet-800"
         >
-          ← Back to Dashboard
-        </a>
+          <span aria-hidden="true">←</span>
+          Back to Dashboard
+        </Link>
 
-        <header className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="mb-2 text-xs font-bold tracking-[0.18em] text-violet-600">
-              WORKSPACE / MANAGEMENT
+            <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-violet-600">
+              Resource Management
             </p>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
               Resources
             </h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Manage rooms, equipment and other reservable resources.
+            <p className="mt-2 text-sm text-slate-500 sm:text-base">
+              Manage rooms and other resources available for reservations.
             </p>
           </div>
 
           <button
             type="button"
             onClick={() => {
+              setShowForm((current) => !current);
               setMessage("");
               setError("");
-              setShowForm((current) => !current);
             }}
-            className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700"
+            className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700"
           >
             {showForm ? "Cancel" : "+ Add Resource"}
           </button>
         </header>
 
+        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              Total Resources
+            </p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {resources.length}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              Available Resources
+            </p>
+            <p className="mt-2 text-3xl font-bold text-emerald-600">
+              {resources.filter((resource) => resource.isAvailable).length}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">
+              Resource Types
+            </p>
+            <p className="mt-2 text-3xl font-bold text-violet-600">
+              {new Set(resources.map((resource) => resource.type)).size}
+            </p>
+          </div>
+        </section>
+
         {message && (
           <div
             role="status"
-            className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+            className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
           >
             {message}
           </div>
@@ -176,7 +228,7 @@ export default function ResourcesPage() {
         {error && (
           <div
             role="alert"
-            className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"
+            className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           >
             {error}
           </div>
@@ -184,64 +236,87 @@ export default function ResourcesPage() {
 
         {showForm && (
           <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <h2 className="mb-1 text-lg font-bold text-slate-900">
-              Add a new resource
+            <h2 className="mb-6 text-xl font-bold text-slate-900">
+              Add New Resource
             </h2>
-            <p className="mb-6 text-sm text-slate-500">
-              Enter the details of the resource you want to register.
-            </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <label className="block text-sm font-medium text-slate-700">
-                  Resource name *
+                <div>
+                  <label
+                    htmlFor="resource-name"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Resource Name *
+                  </label>
                   <input
+                    id="resource-name"
+                    name="name"
                     required
-                    maxLength={120}
                     value={form.name}
                     onChange={(event) =>
                       setForm({ ...form, name: event.target.value })
                     }
-                    placeholder="e.g. Conference Room A"
-                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                    placeholder="e.g. Meeting Room A"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                   />
-                </label>
+                </div>
 
-                <label className="block text-sm font-medium text-slate-700">
-                  Resource type *
+                <div>
+                  <label
+                    htmlFor="resource-type"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Resource Type *
+                  </label>
                   <select
+                    id="resource-type"
+                    name="type"
                     required
                     value={form.type}
                     onChange={(event) =>
                       setForm({ ...form, type: event.target.value })
                     }
-                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                   >
-                    <option>Meeting Room</option>
-                    <option>Equipment</option>
-                    <option>Laboratory</option>
-                    <option>Vehicle</option>
-                    <option>Workspace</option>
-                    <option>Other</option>
+                    <option value="Meeting Room">Meeting Room</option>
+                    <option value="Conference Room">Conference Room</option>
+                    <option value="Laboratory">Laboratory</option>
+                    <option value="Equipment">Equipment</option>
+                    <option value="Workspace">Workspace</option>
+                    <option value="Other">Other</option>
                   </select>
-                </label>
+                </div>
 
-                <label className="block text-sm font-medium text-slate-700">
-                  Location
+                <div>
+                  <label
+                    htmlFor="resource-location"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Location
+                  </label>
                   <input
-                    maxLength={200}
+                    id="resource-location"
+                    name="location"
                     value={form.location}
                     onChange={(event) =>
                       setForm({ ...form, location: event.target.value })
                     }
-                    placeholder="e.g. Floor 2, Building A"
-                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                    placeholder="e.g. Floor 2, Room 201"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                   />
-                </label>
+                </div>
 
-                <label className="block text-sm font-medium text-slate-700">
-                  Capacity
+                <div>
+                  <label
+                    htmlFor="resource-capacity"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Capacity
+                  </label>
                   <input
+                    id="resource-capacity"
+                    name="capacity"
                     type="number"
                     min="1"
                     step="1"
@@ -249,34 +324,41 @@ export default function ResourcesPage() {
                     onChange={(event) =>
                       setForm({ ...form, capacity: event.target.value })
                     }
-                    placeholder="e.g. 12"
-                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+                    placeholder="e.g. 10"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                   />
-                </label>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="resource-description"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Description
+                  </label>
+                  <textarea
+                    id="resource-description"
+                    name="description"
+                    rows={3}
+                    value={form.description}
+                    onChange={(event) =>
+                      setForm({ ...form, description: event.target.value })
+                    }
+                    placeholder="Add details about this resource..."
+                    className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                  />
+                </div>
               </div>
 
-              <label className="block text-sm font-medium text-slate-700">
-                Description
-                <textarea
-                  rows={3}
-                  maxLength={1000}
-                  value={form.description}
-                  onChange={(event) =>
-                    setForm({ ...form, description: event.target.value })
-                  }
-                  placeholder="Describe the resource and its facilities..."
-                  className="mt-2 w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? "Saving..." : "Save Resource"}
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -284,7 +366,7 @@ export default function ResourcesPage() {
                     setForm(initialForm);
                     setError("");
                   }}
-                  className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -293,91 +375,71 @@ export default function ResourcesPage() {
           </section>
         )}
 
-        <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Total Resources</p>
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {resources.length}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Available</p>
-            <p className="mt-2 text-3xl font-bold text-emerald-600">
-              {resources.filter((resource) => resource.isAvailable).length}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">Currently Unavailable</p>
-            <p className="mt-2 text-3xl font-bold text-amber-600">
-              {resources.filter((resource) => !resource.isAvailable).length}
-            </p>
-          </div>
-        </section>
-
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col justify-between gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:p-6">
+          <div className="flex flex-col gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="font-bold text-slate-900">Resource Directory</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                All Resources
+              </h2>
               <p className="mt-1 text-sm text-slate-500">
-                {resources.length} registered resource
-                {resources.length === 1 ? "" : "s"}
+                {filteredResources.length} resource
+                {filteredResources.length === 1 ? "" : "s"} found
               </p>
             </div>
 
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search resources..."
-              aria-label="Search resources"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100 sm:max-w-xs"
-            />
+            <div className="w-full sm:max-w-sm">
+              <label htmlFor="resource-search" className="sr-only">
+                Search resources
+              </label>
+              <input
+                id="resource-search"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by name, type, or location..."
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+              />
+            </div>
           </div>
 
           {loading ? (
-            <div className="p-12 text-center text-sm text-slate-500">
+            <div className="px-5 py-16 text-center text-sm text-slate-500">
               Loading resources...
             </div>
           ) : filteredResources.length === 0 ? (
             <div className="px-5 py-16 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-2xl text-violet-600">
-                ▦
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-violet-50 text-xl text-violet-600">
+                ◇
               </div>
-              <h3 className="mt-4 font-semibold text-slate-900">
+              <h3 className="font-semibold text-slate-900">
                 {search ? "No matching resources" : "No resources yet"}
               </h3>
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
+              <p className="mt-2 text-sm text-slate-500">
                 {search
-                  ? "Try another search term."
-                  : "Add your first resource to start managing your lab rooms and equipment."}
+                  ? "Try a different search term."
+                  : "Add your first resource to get started."}
               </p>
-              {!search && (
-                <button
-                  type="button"
-                  onClick={() => setShowForm(true)}
-                  className="mt-5 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-700"
-                >
-                  + Add your first resource
-                </button>
-              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left">
-                <thead className="bg-slate-50">
-                  <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <th className="px-6 py-4">Resource</th>
-                    <th className="px-4 py-4">Type</th>
-                    <th className="px-4 py-4">Location</th>
-                    <th className="px-4 py-4">Capacity</th>
-                    <th className="px-4 py-4">Availability</th>
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-5 py-4 font-semibold">Resource</th>
+                    <th className="px-5 py-4 font-semibold">Type</th>
+                    <th className="px-5 py-4 font-semibold">Location</th>
+                    <th className="px-5 py-4 font-semibold">Capacity</th>
+                    <th className="px-5 py-4 font-semibold">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredResources.map((resource) => (
-                    <tr key={resource.id} className="hover:bg-slate-50/70">
-                      <td className="px-6 py-4">
-                        <p className="font-semibold text-slate-800">
+                    <tr
+                      key={resource.id}
+                      className="transition hover:bg-slate-50"
+                    >
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-slate-900">
                           {resource.name}
                         </p>
                         {resource.description && (
@@ -386,24 +448,23 @@ export default function ResourcesPage() {
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-4 text-sm text-slate-600">
+                      <td className="px-5 py-4 text-slate-600">
                         {resource.type}
                       </td>
-                      <td className="px-4 py-4 text-sm text-slate-600">
+                      <td className="px-5 py-4 text-slate-600">
                         {resource.location || "—"}
                       </td>
-                      <td className="px-4 py-4 text-sm text-slate-600">
+                      <td className="px-5 py-4 text-slate-600">
                         {resource.capacity ?? "—"}
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-5 py-4">
                         <span
-                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
                             resource.isAvailable
                               ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-700"
+                              : "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          <span className="h-1.5 w-1.5 rounded-full bg-current" />
                           {resource.isAvailable ? "Available" : "Unavailable"}
                         </span>
                       </td>
@@ -415,9 +476,9 @@ export default function ResourcesPage() {
           )}
         </section>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
-          PrimeWave Lab · Resource Management
-        </p>
+        <footer className="mt-6 text-center text-xs text-slate-400">
+          PrimeWave Lab Resource Reservation Management System
+        </footer>
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 type User = {
@@ -25,7 +26,9 @@ export default function UsersPage() {
       setLoading(true);
       setError("");
 
-      const response = await fetch("/api/users");
+      const response = await fetch("/api/users", {
+        cache: "no-store",
+      });
       const result = await response.json();
 
       if (!response.ok || !result.success) {
@@ -35,7 +38,9 @@ export default function UsersPage() {
       setUsers(result.data);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Something went wrong.",
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while loading users.",
       );
     } finally {
       setLoading(false);
@@ -43,10 +48,47 @@ export default function UsersPage() {
   }, []);
 
   useEffect(() => {
-    void loadUsers();
-  }, [loadUsers]);
+    let active = true;
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    async function fetchInitialUsers() {
+      try {
+        const response = await fetch("/api/users", {
+          cache: "no-store",
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Failed to load users.");
+        }
+
+        if (active) {
+          setUsers(result.data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Something went wrong while loading users.",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void fetchInitialUsers();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     setError("");
     setMessage("");
@@ -82,7 +124,9 @@ export default function UsersPage() {
       setMessage("User created successfully.");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to create user.",
+        err instanceof Error
+          ? err.message
+          : "Failed to create user.",
       );
     } finally {
       setSaving(false);
@@ -90,7 +134,7 @@ export default function UsersPage() {
   }
 
   const filteredUsers = users.filter((user) => {
-    const query = search.toLowerCase();
+    const query = search.toLowerCase().trim();
 
     return (
       user.name.toLowerCase().includes(query) ||
@@ -103,12 +147,12 @@ export default function UsersPage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <a
+            <Link
               href="/"
               className="mb-3 inline-flex text-sm text-cyan-400 hover:text-cyan-300"
             >
               ← Back to Dashboard
-            </a>
+            </Link>
 
             <h1 className="text-3xl font-bold tracking-tight">
               User Management
@@ -268,7 +312,9 @@ export default function UsersPage() {
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 font-semibold text-cyan-300">
                               {user.name.charAt(0).toUpperCase()}
                             </div>
-                            <span className="font-medium">{user.name}</span>
+                            <span className="font-medium">
+                              {user.name}
+                            </span>
                           </div>
                         </td>
                         <td className="px-3 py-4 text-slate-300">
